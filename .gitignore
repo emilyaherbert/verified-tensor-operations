@@ -1,0 +1,13 @@
+.stack-work/
+verified-nn.cabal
+*~
+
+
+# Created by https://www.gitignore.io/api/idris
+# Edit at https://www.gitignore.io/?templates=idris
+
+### Idris ###
+*.ibc
+*.o
+
+# End of https://www.gitignore.io/api/idris
