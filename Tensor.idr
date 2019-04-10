@@ -2,7 +2,7 @@ module Tensor
 
 {-
 
-: Matrix [3,3] Double
+: Tensor (DimsType [3,3]) Double
 TS [TS [TZ 0.0, TZ 1.0],
     TS [TZ 2.0, TZ 3.0],
     TS [TZ 4.0, TZ 5.0]]
@@ -21,23 +21,24 @@ t1 + t2
 -}
 
 import Data.Vect
+import Dimension
 
 %access public export
 %default total
 
-Dims : Nat -> Type
-Dims n = Vect n Nat
-
 data Tensor : Dims n -> Type -> Type where
-  TZ : (x : ty) -> Tensor [] ty
-  TS : (xs : Vect n (Tensor dims ty)) -> Tensor (n :: dims) ty
+  TZ : (x : ty) -> Tensor DZ ty
+  TS : (xs : Vect n (Tensor dims ty)) -> Tensor (DS n dims) ty
 
-fill : (dims : Dims n) -> ty -> Tensor dims ty
-fill [] v = TZ v
-fill (x :: xs) v = TS $ replicate x $ fill xs v
+fill : ty -> (dims : Dims n) -> Tensor dims ty
+fill v DZ = TZ v
+fill v (DS x xs) = TS $ replicate x $ fill v xs
 
 zeros : (dims : Dims n) -> Tensor dims Double
-zeros xs = fill xs 0.0
+zeros xs = fill 0.0 xs
+
+get_dims : {dims : Dims n} -> Tensor dims a -> Dims n
+get_dims {dims} _ = dims
 
 {-
 
@@ -77,17 +78,72 @@ Aggregatable (Tensor dims) where
 
 {-
 
-Dimensionality functions.
+Indexing.
 
 -}
 
-canBeBroadcast : Dims n -> Dims m -> Bool
-canBeBroadcast [] [] = True
-canBeBroadcast [] (y :: ys) = True
-canBeBroadcast (x :: xs) [] = True
-canBeBroadcast (x :: xs) (y :: ys) = (x == y || x == 1 || y == 1) && (canBeBroadcast xs ys)
+vectIndex : (i : Nat) -> Vect n a -> Maybe a
+vectIndex Z [] = Nothing
+vectIndex Z (x :: xs) = Just x
+vectIndex (S k) [] = Nothing
+vectIndex (S k) (x :: xs) = vectIndex k xs
 
-broadcast : (xs : Dims n) -> (ys : Dims m) -> {auto ok : canBeBroadcast xs ys = True} -> Dims p
+index :
+  (i : Nat)
+  -> {dims : Dims (S n)}
+  -> Tensor dims a
+  -> Maybe $ Tensor (index i dims) a
+index i (TS xs) = vectIndex i xs
+
+indexMany :
+  (is : Vect n Nat)
+  -> {dims : Dims (n + (S m))}
+  -> Tensor dims a
+  -> Maybe $ Tensor (indexMany is dims) a
+indexMany [] (TS ts) = Just $ TS ts
+indexMany (x :: xs) (TS ts) =
+  case index x (TS ts) of
+       Nothing => Nothing
+       Just ys => indexMany xs ys
+
+vectTake : (n : Nat) -> Vect m a -> Maybe $ Vect n a
+vectTake Z _ = Just []
+vectTake (S k) [] = Nothing
+vectTake (S k) (x :: xs) =
+  case vectTake k xs of
+       Nothing => Nothing
+       Just ys => Just $ x :: ys
+
+vectSlice :
+  (start : Nat)
+  -> (stop : Nat)
+  -> Vect n a
+  -> {auto ok : LTE (S start) stop}
+  -> Maybe $ Vect ((-) stop start {smaller = lteSuccLeft ok}) a
+vectSlice Z     Z     _         {ok} impossible
+vectSlice Z     (S k) xs        {ok} = vectTake (S k) xs
+vectSlice (S k) Z     _         {ok} impossible
+vectSlice (S k) (S j) []        {ok} = Nothing
+vectSlice (S k) (S j) (x :: xs) {ok} = vectSlice k j xs {ok = fromLteSucc ok}
+
+slice :
+  (start : Nat)
+  -> (stop : Nat)
+  -> {dims : Dims (S n)}
+  -> Tensor dims a
+  -> {auto ok : LTE (S start) stop}
+  -> Maybe $ Tensor (slice start stop dims {ok = ok}) a
+slice Z     Z     _       {ok} impossible
+slice Z     (S j) (TS xs) {ok} =
+  case vectTake (S j) xs of
+       Nothing => Nothing
+       Just ys => Just $ TS ys
+slice (S k) Z     _       {ok} impossible
+slice (S k) (S j) (TS []) {ok} = Nothing
+slice (S k) (S j) (TS xs) {ok} =
+  case vectSlice (S k) (S j) xs {ok = ok} of
+       Nothing => Nothing
+       Just ys => Just $ TS ys
 
 {-
 
@@ -99,17 +155,17 @@ zipWith : (a -> b -> c) -> Tensor dims a -> Tensor dims b -> Tensor dims c
 zipWith f (TZ x) (TZ y) = TZ $ f x y
 zipWith f (TS xs) (TS ys) = TS $ Data.Vect.zipWith (Tensor.zipWith f) xs ys
 
-add : Num a => Tensor dims a -> Tensor dims a -> Tensor dims a
-add xs ys = Tensor.zipWith (+) xs ys
+plus : Num a => Tensor dims a -> Tensor dims a -> Tensor dims a
+plus xs ys = Tensor.zipWith (+) xs ys
 
 (+) : Num a => Tensor dims a -> Tensor dims a -> Tensor dims a
-(+) xs ys = add xs ys
+(+) xs ys = plus xs ys
 
-sub : Num a => Neg a => Tensor dims a -> Tensor dims a -> Tensor dims a
-sub xs ys = add xs $ map ((-1) *) ys
+minus : Num a => Neg a => Tensor dims a -> Tensor dims a -> Tensor dims a
+minus xs ys = plus xs $ map ((-1) *) ys
 
 (-) : Num a => Neg a => Tensor dims a -> Tensor dims a -> Tensor dims a
-(-) xs ys = sub xs ys
+(-) xs ys = minus xs ys
 
 mult : Num a => Tensor dims a -> Tensor dims a -> Tensor dims a
 mult xs ys = Tensor.zipWith (*) xs ys
@@ -125,15 +181,15 @@ div xs ys = Tensor.zipWith (/) xs ys
 
 {-
 
-Toy examples.
+testers...
 
 -}
 
-test1 : Tensor [10, 10] Double
-test1 = fill [10, 10] 0.5
+test1 : Tensor (DimsType [10, 10]) Double
+test1 = fill 0.5 $ DimsType [10, 10]
 
-test2 : Tensor [10, 10] Double
-test2 = fill [10, 10] 1.5
+test2 : Tensor (DimsType [10, 10]) Double
+test2 = fill 1.5 $ DimsType [10, 10]
 
-test3 : Tensor [10, 10, 10] Double
-test3 = fill [10, 10, 10] 1.0
+test3 : Tensor (DimsType [10, 10, 10]) Double
+test3 = fill 1.0 $ (DimsType [10, 10, 10])
