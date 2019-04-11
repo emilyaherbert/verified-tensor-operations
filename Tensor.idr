@@ -82,6 +82,12 @@ Indexing.
 
 -}
 
+{-
+head : Tensor (DS d ds) a -> Tensor (DS 1 ds) a
+head (TS []) = ?rhs_1
+head (TS (x :: xs)) = ?rhs_2
+-}
+
 vectIndex : (i : Nat) -> Vect n a -> Maybe a
 vectIndex Z [] = Nothing
 vectIndex Z (x :: xs) = Just x
@@ -92,9 +98,11 @@ index :
   (i : Nat)
   -> {dims : Dims (S n)}
   -> Tensor dims a
-  -> Maybe $ Tensor (index i dims) a
+  -> {auto headOk : LTE (S i) (head dims)}
+  -> Maybe $ Tensor (indexPf i dims) a
 index i (TS xs) = vectIndex i xs
 
+{-
 indexMany :
   (is : Vect n Nat)
   -> {dims : Dims (n + (S m))}
@@ -105,6 +113,7 @@ indexMany (x :: xs) (TS ts) =
   case index x (TS ts) of
        Nothing => Nothing
        Just ys => indexMany xs ys
+  -}
 
 vectTake : (n : Nat) -> Vect m a -> Maybe $ Vect n a
 vectTake Z _ = Just []
