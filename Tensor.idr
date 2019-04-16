@@ -158,14 +158,22 @@ concat (TS xs) (TS ys) = TS $ xs ++ ys
 (++) xs ys = concat xs ys
 
 --------------------------------------------------------------------------------
--- Dimension transformations
+-- Indexing
 --------------------------------------------------------------------------------
 
+||| Data.Vect.index without using a Fin.
+vectIndex :
+  (n : Nat)
+  -> Vect (n + (S m)) ty
+  -> ty
+vectIndex Z     (x :: xs) = x
+vectIndex (S k) (x :: xs) = vectIndex k xs
+
 index :
-  Fin n
-  -> Tensor (n :: dims) ty
+  (n : Nat)
+  -> Tensor ((n + (S m)) :: dims) ty
   -> Tensor dims ty
-index i (TS xs) = Data.Vect.index i xs
+index n (TS xs) = vectIndex n xs
 
 {-
 tIndex :
@@ -191,6 +199,10 @@ tIndex :
   -> Tensor dims ty
 tIndex xs is = xs
 -}
+
+--------------------------------------------------------------------------------
+-- Slicing
+--------------------------------------------------------------------------------
 
 ||| Get the first n elements of the first dimension of a Tensor.
 take :
@@ -243,6 +255,10 @@ slice :
   -> Tensor (count :: dims) ty
 slice start count xs = Tensor.take count $ Tensor.drop start xs
 
+--------------------------------------------------------------------------------
+-- Reshapes
+--------------------------------------------------------------------------------
+
 flatten :
   Tensor (n :: m :: dims) ty
   -> Tensor (n * m :: dims) ty
@@ -267,19 +283,41 @@ unsqueeze :
 unsqueeze (TZ x) = TS [TZ x]
 unsqueeze (TS xs) = TS [TS xs]
 
+--------------------------------------------------------------------------------
+-- Updating values
+--------------------------------------------------------------------------------
+
+||| Data.Vect.replaceAt without using a Fin.
+vectReplaceAt :
+  (n : Nat)
+  -> ty
+  -> Vect (n + (S m)) ty
+  -> Vect (n + (S m)) ty
+vectReplaceAt Z     v (x :: xs) = v :: xs
+vectReplaceAt (S k) v (x :: xs) = x :: (vectReplaceAt k v xs)
+
 replaceAt :
-  Fin n
+  (n : Nat)
   -> Tensor dims ty
-  -> Tensor (n :: dims) ty
-  -> Tensor (n :: dims) ty
-replaceAt n v (TS xs) = TS $ Data.Vect.replaceAt n v xs
+  -> Tensor ((n + (S m)) :: dims) ty
+  -> Tensor ((n + (S m)) :: dims) ty
+replaceAt n v (TS xs) = TS $ vectReplaceAt n v xs
+
+||| Data.Vect.updateAt without using a Fin.
+vectUpdateAt :
+  (n : Nat)
+  -> (ty -> ty)
+  -> Vect (n + (S m)) ty
+  -> Vect (n + (S m)) ty
+vectUpdateAt Z     f (x :: xs) = (f x) :: xs
+vectUpdateAt (S k) f (x :: xs) = x :: (vectUpdateAt k f xs)
 
 updateAt :
-  Fin n
+  (n : Nat)
   -> (Tensor dims ty -> Tensor dims ty)
-  -> Tensor (n :: dims) ty
-  -> Tensor (n :: dims) ty
-updateAt n f (TS xs) = TS $ Data.Vect.updateAt n f xs
+  -> Tensor ((n + (S m)) :: dims) ty
+  -> Tensor ((n + (S m)) :: dims) ty
+updateAt n f (TS xs) = TS $ vectUpdateAt n f xs
 
 --------------------------------------------------------------------------------
 -- Properties
