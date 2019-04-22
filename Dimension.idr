@@ -54,3 +54,10 @@ res = ap [unpack, cos] ["hello", 0.5]
 
 -- TODO: need some property that says:
 -- given dims and some dims1 that contains dims, can split dims1 into dims ++ rest
+
+concatLeftDSRightDZ :
+  (xs : Dims (S n))
+  -> xs ++ [] = xs
+concatLeftDSRightDZ (x :: xs) = ?i_1
+
+-- https://stackoverflow.com/questions/29785384/how-can-i-arrange-to-pattern-match-on-a-dependent-view

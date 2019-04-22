@@ -7,12 +7,13 @@ import Dimension
 %access public export
 %default total
 
-data Tensor : Dims n -> Type -> Type where
-  TZ : (x : ty) -> Tensor [] ty
-  TS : (xs : Vect n (Tensor dims ty)) -> Tensor (n :: dims) ty
+mutual
+  Scalar : Type -> Type
+  Scalar ty = Tensor [] ty
 
-Scalar : Type -> Type
-Scalar ty = Tensor [] ty
+  data Tensor : Dims n -> Type -> Type where
+    TZ : (x : ty) -> Scalar ty
+    TS : (xs : Vect n (Tensor dims ty)) -> Tensor (n :: dims) ty
 
 get_dims : {dims : Dims n} -> Tensor dims a -> Dims n
 get_dims {dims} _ = dims
@@ -40,7 +41,7 @@ Functor (Tensor dims) where
   map func (TZ x) = TZ $ func x
   map func (TS xs) = TS $ map (map func) xs
 
-||| Depth first.
+||| Depth first folds.
 Foldable (Tensor dims) where
   foldr func acc (TZ x) = func x acc
   foldr func acc (TS xs@((TZ y) :: ys)) = foldr (\(TZ e),a => func e a) acc xs
@@ -55,7 +56,7 @@ interface Aggregatable (t : Type -> Type) where
   aggregater : (elem -> acc -> acc) -> (acc -> acc -> acc) -> acc -> t elem -> acc
   aggregatel : (acc -> elem -> acc) -> (acc -> acc -> acc) -> acc -> t elem -> acc
 
-||| Breadth first.
+||| Breadth first folds.
 Aggregatable (Tensor dims) where
   aggregater seqOp combOp acc (TZ x) = seqOp x acc
   aggregater seqOp combOp acc (TS xs@((TZ y) :: ys)) = foldr (\(TZ e),a => seqOp e a) acc xs
@@ -169,36 +170,20 @@ vectIndex :
 vectIndex Z     (x :: xs) = x
 vectIndex (S k) (x :: xs) = vectIndex k xs
 
+||| Extract a particular element from the first dimension of a Tensor.
 index :
   (n : Nat)
   -> Tensor ((n + (S m)) :: dims) ty
   -> Tensor dims ty
 index n (TS xs) = vectIndex n xs
 
-{-
-tIndex :
-  Fin n
-  -> Fin m
-  -> Tensor (n :: m :: dims) ty
+tindex :
+  (is : Vect n Nat)
+  -> {js : Vect n Nat}
+  -> Tensor ((zipWith (\x,y => x + (S y)) is js) ++ dims) ty
   -> Tensor dims ty
-tIndex i j xs = Tensor.index j $ Tensor.index i xs
--}
-
-{-
-tIndex :
-  {dims : Dims n}
-  -> HVect (map (\x => Fin x) (m :: dims))
-  -> Tensor (m :: dims) ty
-  -> Tensor dims ty
--}
-
-{-
-tIndex :
-  Tensor dims ty
-  -> HVect (map (\x => Fin x) dims)
-  -> Tensor dims ty
-tIndex xs is = xs
--}
+tindex {n = Z}     {js = []}        []        xs = xs
+tindex {n = (S k)} {js = (l :: ls)} (i :: is) xs = Tensor.tindex is {n = k} {js = ls} $ Tensor.index i xs
 
 --------------------------------------------------------------------------------
 -- Slicing
@@ -255,6 +240,25 @@ slice :
   -> Tensor (count :: dims) ty
 slice start count xs = Tensor.take count $ Tensor.drop start xs
 
+takePrefix :
+  (xs : Tensor (n :: dims) ty)
+  -> (ys : Tensor (m :: dims) ty)
+  -> Tensor.take n (xs ++ ys) = xs
+takePrefix (TS xs) (TS ys) = rewrite takePrefix xs ys in Refl
+
+dropPrefix :
+  (xs : Tensor (n :: dims) ty)
+  -> (ys : Tensor (m :: dims) ty)
+  -> Tensor.drop n (xs ++ ys) = ys
+dropPrefix (TS xs) (TS ys) = rewrite dropPrefix xs ys in Refl
+
+concatTakeDrop :
+  (n : Nat)
+  -> (xs : Tensor (n + m :: dims) ty)
+  -> (Tensor.take n xs) ++ (Tensor.drop n xs) = xs
+concatTakeDrop {m} Z (TS xs) = Refl
+concatTakeDrop {m} (S k) (TS xs) = ?ctd
+
 --------------------------------------------------------------------------------
 -- Reshapes
 --------------------------------------------------------------------------------
@@ -264,6 +268,14 @@ flatten :
   -> Tensor (n * m :: dims) ty
 flatten (TS []) = TS []
 flatten (TS (x :: xs)) = concat x $ flatten (TS xs)
+
+unflatten :
+  (n : Nat)
+  -> {auto ok : LTE 1 n}
+  -> Tensor (n * m :: dims) ty
+  -> Tensor (n :: m :: dims) ty
+unflatten {ok}  Z    (TS xs) impossible
+unflatten {ok} (S k) (TS xs) = ?w_1
 
 squeeze :
   Tensor (1 :: dims) ty
@@ -280,8 +292,26 @@ squeezeAt :
 unsqueeze :
   Tensor dims ty
   -> Tensor (1 :: dims) ty
-unsqueeze (TZ x) = TS [TZ x]
-unsqueeze (TS xs) = TS [TS xs]
+unsqueeze xs = TS [xs]
+
+||| Squeeze a tensor of dimension [1] produces a Scalar.
+squeezeToScalar :
+  (xs : Tensor [1] ty)
+  -> Tensor.squeeze xs = Tensor.index 0 xs
+squeezeToScalar (TS (x :: [])) = Refl
+
+||| Unsqueeze then squeeze does nothing.
+squeezeUnsqueezed :
+  (xs : Tensor dims ty)
+  -> Tensor.squeeze (Tensor.unsqueeze xs) = xs
+squeezeUnsqueezed (TZ x) = Refl
+squeezeUnsqueezed (TS xs) = Refl
+
+||| Squeeze then unsqueeze does nothing.
+unsqueezeSqueezed :
+  (xs : Tensor (1 :: dims) ty)
+  -> Tensor.unsqueeze (Tensor.squeeze xs) = xs
+unsqueezeSqueezed (TS (x :: [])) = Refl
 
 --------------------------------------------------------------------------------
 -- Updating values
@@ -320,6 +350,31 @@ updateAt :
 updateAt n f (TS xs) = TS $ vectUpdateAt n f xs
 
 --------------------------------------------------------------------------------
+-- Splitting
+--------------------------------------------------------------------------------
+
+||| Split at n.
+splitAt :
+  (n : Nat)
+  -> (xs : Tensor (n + m :: dims) ty)
+  -> (Tensor (n :: dims) ty, Tensor (m :: dims) ty)
+splitAt {m} n xs = (Tensor.takeLeft n xs, Tensor.takeRight m xs)
+
+||| Basically concat but it takes a tuple of
+join :
+  (Tensor (n :: dims) ty, Tensor (m :: dims) ty)
+  -> Tensor (n + m :: dims) ty
+join (xs, ys) = Tensor.concat xs ys
+
+||| Splitting and then joining does nothing.
+splitJoin :
+  (n : Nat)
+  -> (xs : Tensor (n + m :: dims) ty)
+  -> Tensor.join (Tensor.splitAt n xs) = xs
+splitJoin Z (TS xs) = Refl
+splitJoin (S k) xs = ?ou_3
+
+--------------------------------------------------------------------------------
 -- Properties
 --------------------------------------------------------------------------------
 
@@ -329,21 +384,15 @@ min acc xs = foldl (\a,e => if a < e then a else e) acc xs
 max : Ord ty => ty -> Tensor dims ty -> ty
 max acc xs = foldl (\a,e => if a > e then a else e) acc xs
 
--- TODO: squeeze + unsqueeze = original
--- TODO: unsqueeze + squeeze = original
-
-||| Unsqueeze then squeeze does nothing.
-squeezeUnsqueezed :
+{-
+-- Cant prove this because we don't know contents ?
+plusCommutative : Num ty =>
   (xs : Tensor dims ty)
-  -> Tensor.squeeze (Tensor.unsqueeze xs) = xs
-squeezeUnsqueezed (TZ x) = Refl
-squeezeUnsqueezed (TS xs) = Refl
-
-||| Squeeze then unsqueeze does nothing.
-unsqueezeSqueezed :
-  (xs : Tensor (1 :: dims) ty)
-  -> Tensor.unsqueeze (Tensor.squeeze xs) = xs
-unsqueezeSqueezed (TS xs) = ?rhs_1
+  -> (ys : Tensor dims ty)
+  -> xs + ys = ys + xs
+plusCommutative (TZ x) (TZ y) = rewrite 
+plusCommutative (TS xs) (TS ys) = ?ooo_1
+-}
 
 --------------------------------------------------------------------------------
 -- Test tensors
@@ -372,6 +421,9 @@ test5 = Tensor.fill 1.0 [1, 3, 4, 3]
 index_ : Tensor [10, 10] Double
 index_ = Tensor.index 4 test3
 
+--tindex_ : Tensor [10] Double
+--tindex_ = Tensor.tindex [4,3] test3
+
 slice_ : Tensor [3, 10, 10] Double
 slice_ = Tensor.slice 3 3 test3
 
@@ -392,3 +444,16 @@ replaceAt_ = Tensor.replaceAt 9 test1 test3
 
 updateAt_ : Tensor [10, 10] Double
 updateAt_ = Tensor.updateAt 9 (\x => x + x) test1
+
+--------------------------------------------------------------------------------
+-- Concat test
+--------------------------------------------------------------------------------
+
+stitch2 :
+  Dims n
+  -> Dims m
+  -> Dims (n + m)
+stitch2 {n = Z}     []        []        = []
+stitch2 {n = (S k)} (x :: xs) []        = rewrite plusZeroRightNeutral (S k) in (x :: xs)
+stitch2 {n = Z}     []        (y :: ys) = (y :: ys)
+stitch2 {n = (S k)} (x :: xs) (y :: ys) = x :: (stitch2 xs (y :: ys))
