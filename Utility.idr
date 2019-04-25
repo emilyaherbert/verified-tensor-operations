@@ -1,82 +1,111 @@
-module Utility
+import Data.Vect
+import Data.HVect
 
-data Vect : (n : Nat) -> (ty : Type) -> Type where
-  Nil : Vect 0 ty
-  (::) : (x : ty) -> (xs : Vect n ty) -> Vect (S n) ty
-  --(++) : (xs : Vect n ty) -> (ys : Vect m ty) -> Vect (n + m) ty
+vectInjective1 :
+  {xs : Vect n a}
+  -> {ys : Vect m b}
+  -> x :: xs ~=~ y :: ys
+  -> x ~=~ y
+vectInjective1 Refl = Refl
 
-(++) :
-  Vect n ty
-  -> Vect m ty
-  -> Vect (n + m) ty
-(++) [] [] = []
-(++) 
+vectInjective2 :
+  {xs : Vect n a}
+  -> {ys : Vect m b}
+  -> x :: xs ~=~ y :: ys
+  -> xs ~=~ ys
+vectInjective2 Refl = Refl
+
+vectConcatCong:
+  (xs : Vect n elem)
+  -> (ys : Vect m elem)
+  -> (zs : Vect m elem)
+  -> (ys = zs)
+  -> (xs ++ ys = xs ++ zs)
+vectConcatCong xs ys ys Refl = Refl
 
 {-
-
-headUnequal : DecEq a =>
+vectInjective3 :
   {xs : Vect n a}
-  -> {ys : Vect n a}
-  -> (contra : (x = y) -> Void)
-  -> (x :: xs) = (y :: ys)
-  -> Void
-headUnequal contra Refl = contra Refl
-
-tailUnequal : DecEq a =>
-  {xs : Vect n a}
-  -> {ys : Vect n a}
-  -> (contra : (xs = ys) -> Void)
-  -> (x :: xs) = (y :: ys)
-  -> Void
-tailUnequal contra Refl = contra Refl
-
-headUnequal2 : DecEq a =>
-  {xs : Vect n a}
-  -> {ys : Vect n a}
-  -> (contra : (x = y) -> Void)
-  -> (x ++ xs) = (y ++ ys)
-  -> Void
-headUnequal2 contra Refl = contra Refl
-
-tailUnequal2 : DecEq a =>
-  {xs : Vect n a}
-  -> {ys : Vect n a}
-  -> (contra : (xs = ys) -> Void)
-  -> (x ++ xs) = (y ++ ys)
-  -> Void
-tailUnequal2 contra Refl = contra Refl
-
-DecEq a => DecEq (Vect n a) where
-  decEq [] [] = Yes Refl
-  decEq (x :: xs) (y :: ys) = case decEq x y of
-                                No contra => No (headUnequal contra)
-                                Yes Refl => case decEq xs ys of
-                                                Yes Refl => Yes Refl
-                                                No contra => No (tailUnequal contra)
-  decEq (x ++ xs) (y ++ ys) = case decEq x y of
-                                No contra => No (headUnequal2 contra)
-                                Yes Refl => case decEq xs ys of
-                                                Yes Refl => Yes Refl
-                                                No contra => No (tailUnequal2 contra)
+  -> {ys : Vect m b}
+  -> [x] ++ xs ~=~ [y] ++ ys
+  -> [x] ~=~ [y]
+vectInjective3 pf = ?rhs
 -}
 
-Dims : Nat -> Type
-Dims n = Vect n Nat
+vectInjective4 :
+  {xs : Vect n a}
+  -> {ys : Vect m b}
+  -> [x] ++ xs ~=~ [y] ++ ys
+  -> x ~=~ y
+vectInjective4 Refl = Refl
 
-data Tensor : Dims n -> Type -> Type where
-  TZ : (x : ty) -> Tensor [] ty
-  TS : (xs : Vect n (Tensor dims ty)) -> Tensor (n :: dims) ty
-  TC : (xs : Vect n (Tensor dims ty)) -> Tensor ([n] ++ dims) ty
-  -- TS : (xs : Vect n (Tensor dims ty)) -> (ys : Vect m (Tensor dims ty))-> Tensor (n + m :: dims) ty
+vectInjective5 :
+  {xs : Vect n a}
+  -> {ys : Vect m b}
+  -> [x] ++ xs ~=~ [y] ++ ys
+  -> xs ~=~ ys
+vectInjective5 Refl = Refl
 
-test1 : Tensor [10, 10] Double
-test1 = TS [TS [TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5],
-            TS [TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5],
-            TS [TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5],
-            TS [TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5],
-            TS [TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5],
-            TS [TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5],
-            TS [TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5],
-            TS [TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5],
-            TS [TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5],
-            TS [TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5, TZ 0.5]]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+data VectView : Vect n Nat -> Type where
+  MkVectView : (xs : Vect n Nat) -> VectView xs
+
+-- http://cattheory.com/posts/2017-11-14-scoped-implicit-conversions.html
+implicit
+convertVectToView : (xs : Vect n Nat) -> VectView xs
+convertVectToView xs = MkVectView xs
+
+implicit
+convertViewToVect : {xs : Vect n Nat} -> VectView xs -> Vect n Nat
+convertViewToVect (MkVectView xs) = xs
+
+twoOnes : (xs : VectView [1, 1]) -> Vect 2 Nat
+twoOnes xs = xs
+
+
+data Ok : Nat -> Nat -> Nat -> Type where
+  OkZ : Ok 0 0 0
+  OkSL : (ok : Ok n m p) -> Ok (S n) m     (S p)
+  OkSR : (ok : Ok n m p) -> Ok n     (S m) (S p)
+
+inferB : 
+  (a : Nat)
+  -> {b : Nat}
+  -> (c : Nat)
+  -> {auto ok : Ok a b c}
+  -> Nat
+inferB {b} a c = b
+
+data Oks : List Nat -> List Nat -> List Nat -> Type where
+  OksZ : Oks [] [] []
+  OksS : (ok : Ok n m p) -> Oks ns ms ps -> Oks (n :: ns) (m :: ms) (p :: ps)
+
+--data Oks : List Type -> Type where
+--  OksZ : Oks []
+--  OksS : (ok : Ok a b c) -> Oks oks -> Oks $ (Ok a b c) :: oks
+
+inferBs :
+  (as : List Nat)
+  -> {bs : List Nat}
+  -> (cs : List Nat)
+  -> {auto ok : Oks as bs cs}
+  -> List Nat
+inferBs {bs} as cs = bs

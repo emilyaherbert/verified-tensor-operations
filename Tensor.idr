@@ -7,6 +7,14 @@ import Dimension
 %access public export
 %default total
 
+{-
+
+Proof for properties are scattered by the relavent operations.
+Many operations do not have any provable properties, as they operate on
+the contents of a Tensor rather than on the Tensor itself.
+
+-}
+
 mutual
   Scalar : Type -> Type
   Scalar ty = Tensor [] ty
@@ -22,10 +30,12 @@ get_dims {dims} _ = dims
 -- Building
 --------------------------------------------------------------------------------
 
+||| Fill a Tensor of some shape with some value.
 fill : ty -> (dims : Dims n) -> Tensor dims ty
 fill v [] = TZ v
 fill v (x :: xs) = TS $ replicate x $ fill v xs
 
+||| Fill a Tensor of the same shape as some Tensor with some value.
 fillLike : ty1 -> Tensor dims ty2 -> Tensor dims ty1
 fillLike v xs = fill v $ get_dims xs
 
@@ -33,10 +43,12 @@ fillLike v xs = fill v $ get_dims xs
 -- Interfaces
 --------------------------------------------------------------------------------
 
+||| Implements equality.
 Eq ty => Eq (Tensor dims ty) where
   (==) (TZ x) (TZ y) = x == y
   (==) (TS xs) (TS ys) = foldl (\acc,elem => acc && elem) True $ zipWith (\x,y => x == y) xs ys
 
+||| Implements maps.
 Functor (Tensor dims) where
   map func (TZ x) = TZ $ func x
   map func (TS xs) = TS $ map (map func) xs
@@ -76,6 +88,7 @@ Aggregatable (Tensor dims) where
 -- Zips and unzips
 --------------------------------------------------------------------------------
 
+||| Zip two Tensors and perform some operation on the zipped elements.
 zipWith :
   (a -> b -> c)
   -> Tensor dims a
@@ -84,6 +97,7 @@ zipWith :
 zipWith f (TZ x)  (TZ y)  = TZ $ f x y
 zipWith f (TS xs) (TS ys) = TS $ Data.Vect.zipWith (Tensor.zipWith f) xs ys
 
+||| Zip three Tensors and perform some operation on the zipped elements.
 zipWith3 :
   (a -> b -> c -> d)
   -> Tensor dims a
@@ -93,12 +107,14 @@ zipWith3 :
 zipWith3 f (TZ x)  (TZ y)  (TZ z)  = TZ $ f x y z
 zipWith3 f (TS xs) (TS ys) (TS zs) = TS $ Data.Vect.zipWith3 (Tensor.zipWith3 f) xs ys zs
 
+||| Zip two Tensors.
 zip :
   Tensor dims a
   -> Tensor dims b
   -> Tensor dims (a, b)
 zip xs ys = Tensor.zipWith (\x,y => (x,y)) xs ys
 
+||| Zip three Tensors.
 zip3 :
   Tensor dims a
   -> Tensor dims b
@@ -106,6 +122,7 @@ zip3 :
   -> Tensor dims (a, b ,c)
 zip3 xs ys zs = Tensor.zipWith3 (\x,y,z => (x,y,z)) xs ys zs
 
+||| Unzip two Tensors.
 unzip : 
   Tensor dims (a, b)
   -> (Tensor dims a, Tensor dims b)
@@ -115,6 +132,7 @@ unzip (TS xs) =
   let (ys, zs) = Data.Vect.unzip recur in
   (TS ys, TS zs)
 
+||| Unzip three Tensors.
 unzip3 : 
   Tensor dims (a, b, c)
   -> (Tensor dims a, Tensor dims b, Tensor dims c)
@@ -123,6 +141,32 @@ unzip3 (TS xs) =
   let recur = map (Tensor.unzip3) xs in
   let (ys, zs, zzs) = Data.Vect.unzip3 recur in
   (TS ys, TS zs, TS zzs)
+
+-- TODO: zip then unzip does nothing
+-- TODO: unzip then zip does nothing
+-- TODO: zip3...
+
+--------------------------------------------------------------------------------
+-- Scales and shifts
+--------------------------------------------------------------------------------
+
+scale : Num ty => Tensor dims ty -> ty -> Tensor dims ty
+scale xs v = map (\x => x * v) xs
+
+scaleUp : Num ty => Tensor dims ty -> ty -> Tensor dims ty
+scaleUp xs v = scale xs v
+
+scaleDown : (Num ty, Neg ty) => Tensor dims ty -> ty -> Tensor dims ty
+scaleDown xs v = scale xs (-v)
+
+shift : Num ty => Tensor dims ty -> ty -> Tensor dims ty
+shift xs v = map (\x => x + v) xs
+
+shiftUp : Num ty => Tensor dims ty -> ty -> Tensor dims ty
+shiftUp xs v = shift xs v
+
+shiftDown : (Num ty, Neg ty) => Tensor dims ty -> ty -> Tensor dims ty
+shiftDown xs v = shift xs (-v)
 
 --------------------------------------------------------------------------------
 -- Combine-two
@@ -170,40 +214,72 @@ vectIndex :
 vectIndex Z     (x :: xs) = x
 vectIndex (S k) (x :: xs) = vectIndex k xs
 
-||| Extract a particular element from the first dimension of a Tensor.
+||| Extract a particular element from the first dimension.
 index :
   (n : Nat)
   -> Tensor ((n + (S m)) :: dims) ty
   -> Tensor dims ty
 index n (TS xs) = vectIndex n xs
 
+{-
 tindex :
-  (is : Vect n Nat)
+  (is : Vect n Nat)z
+  {X : Vect n Nat}
   -> {js : Vect n Nat}
-  -> Tensor ((zipWith (\x,y => x + (S y)) is js) ++ dims) ty
+  -> Tensor (X ++ dims) ty
+  -> Data is X js
   -> Tensor dims ty
 tindex {n = Z}     {js = []}        []        xs = xs
 tindex {n = (S k)} {js = (l :: ls)} (i :: is) xs = Tensor.tindex is {n = k} {js = ls} $ Tensor.index i xs
+-}
+
+tindex :
+  (is : Vect (S n) Nat)
+  -> {auto js : Vect (S n) Nat}
+  -> Tensor ((zipWith (\i,j => i + (S j)) is js) ++ dims) ty
+  -> Tensor dims ty
+tindex {n = Z}     {js = (l :: [])} (i :: []) xs = Tensor.index i xs
+tindex {n = (S k)} {js = (l :: ls)} (i :: is) xs = Tensor.tindex is {n = k} {js = ls} $ Tensor.index i xs
+
+{-
+tindex : 
+  (is : Dims (S n))
+  -> {js : Dims (S n)}
+  -> {xs : Dims (S n)}
+  -> {ok : CompatibleDims is js xs}
+  -> Tensor (xs ++ dims) ty
+  -> Bool
+-}
+
+{-
+tindex :
+  (is : Dims (S n))
+  -> {js : Dims (S n)}
+  -> {xs : Dims (S n)}
+  -> Tensor (xs ++ dims) ty
+  -> {ok : CompatibleDims is js xs}
+  -> Tensor dims ty
+-}
 
 --------------------------------------------------------------------------------
 -- Slicing
 --------------------------------------------------------------------------------
 
-||| Get the first n elements of the first dimension of a Tensor.
+||| Get the first n elements of the first dimension.
 take :
   (n : Nat)
   -> Tensor ((n + m) :: dims) ty
   -> Tensor (n :: dims) ty
 take n (TS xs) = TS $ Data.Vect.take n xs
 
-||| Drop the first n elements of the first dimension of a Tensor.
+||| Drop the first n elements of the first dimension.
 drop :
   (n : Nat)
   -> Tensor ((n + m) :: dims) ty
   -> Tensor (m :: dims) ty
 drop n (TS xs) = TS $ Data.Vect.drop n xs
 
-||| Get the first n elements of the first dimension of a Tensor.
+||| Get the first n elements of the first dimension.
 ||| Equivalent of take.
 takeLeft :
   (n : Nat)
@@ -211,14 +287,14 @@ takeLeft :
   -> Tensor (n :: dims) ty
 takeLeft n xs = take n xs
 
-||| Get the last n elements of the first dimension of a Tensor.
+||| Get the last n elements of the first dimension.
 takeRight :
   (n : Nat)
   -> Tensor ((m + n) :: dims) ty
   -> Tensor (n :: dims) ty
 takeRight {m} n xs = drop m xs
 
-||| Drop the first n elements of the first dimension of a Tensor.
+||| Drop the first n elements of the first dimension.
 ||| Equivalent of drop.
 dropLeft :
   (n : Nat)
@@ -226,13 +302,14 @@ dropLeft :
   -> Tensor (m :: dims) ty
 dropLeft n xs = drop n xs
 
-||| Drop the last n elements of the first dimension of a Tensor.
+||| Drop the last n elements of the first dimension.
 dropRight :
   (n : Nat)
   -> Tensor ((m + n) :: dims) ty
   -> Tensor (m :: dims) ty
 dropRight {m} n xs = take m xs
 
+||| Take a slice from start to (start + count) of the first dimension.
 slice :
   (start : Nat)
   -> (count : Nat)
@@ -263,12 +340,14 @@ concatTakeDrop {m} (S k) (TS xs) = ?ctd
 -- Reshapes
 --------------------------------------------------------------------------------
 
+||| Flattens the first dimension.
 flatten :
   Tensor (n :: m :: dims) ty
   -> Tensor (n * m :: dims) ty
 flatten (TS []) = TS []
 flatten (TS (x :: xs)) = concat x $ flatten (TS xs)
 
+||| Unflattens the first dimension of a Tensor by adding a prefix dimension n.
 unflatten :
   (n : Nat)
   -> {auto ok : LTE 1 n}
@@ -277,6 +356,7 @@ unflatten :
 unflatten {ok}  Z    (TS xs) impossible
 unflatten {ok} (S k) (TS xs) = ?w_1
 
+||| Squeezes the first dimension.
 squeeze :
   Tensor (1 :: dims) ty
   -> Tensor dims ty
@@ -289,16 +369,17 @@ squeezeAt :
   -> Tensor (front ++ (1 :: back)) ty
   -> Tensor (front ++ back) ty
 
+||| Unsqueezes the first dimension.
 unsqueeze :
   Tensor dims ty
   -> Tensor (1 :: dims) ty
 unsqueeze xs = TS [xs]
 
-||| Squeeze a tensor of dimension [1] produces a Scalar.
-squeezeToScalar :
+||| Squeezing a tensor of dimension [1] is the same as taking index 0.
+squeezeIndex :
   (xs : Tensor [1] ty)
   -> Tensor.squeeze xs = Tensor.index 0 xs
-squeezeToScalar (TS (x :: [])) = Refl
+squeezeIndex (TS (x :: [])) = Refl
 
 ||| Unsqueeze then squeeze does nothing.
 squeezeUnsqueezed :
@@ -320,15 +401,16 @@ unsqueezeSqueezed (TS (x :: [])) = Refl
 ||| Data.Vect.replaceAt without using a Fin.
 vectReplaceAt :
   (n : Nat)
-  -> ty
-  -> Vect (n + (S m)) ty
+  -> (v : ty)
+  -> (xs : Vect (n + (S m)) ty)
   -> Vect (n + (S m)) ty
 vectReplaceAt Z     v (x :: xs) = v :: xs
 vectReplaceAt (S k) v (x :: xs) = x :: (vectReplaceAt k v xs)
 
+||| Replace an element in the first dimension.
 replaceAt :
   (n : Nat)
-  -> Tensor dims ty
+  -> (v : Tensor dims ty)
   -> Tensor ((n + (S m)) :: dims) ty
   -> Tensor ((n + (S m)) :: dims) ty
 replaceAt n v (TS xs) = TS $ vectReplaceAt n v xs
@@ -342,6 +424,7 @@ vectUpdateAt :
 vectUpdateAt Z     f (x :: xs) = (f x) :: xs
 vectUpdateAt (S k) f (x :: xs) = x :: (vectUpdateAt k f xs)
 
+||| Update an element in the first dimension.
 updateAt :
   (n : Nat)
   -> (Tensor dims ty -> Tensor dims ty)
@@ -353,20 +436,20 @@ updateAt n f (TS xs) = TS $ vectUpdateAt n f xs
 -- Splitting
 --------------------------------------------------------------------------------
 
-||| Split at n.
+||| Split at n in the first dimension.
 splitAt :
   (n : Nat)
   -> (xs : Tensor (n + m :: dims) ty)
   -> (Tensor (n :: dims) ty, Tensor (m :: dims) ty)
 splitAt {m} n xs = (Tensor.takeLeft n xs, Tensor.takeRight m xs)
 
-||| Basically concat but it takes a tuple of
+||| Concatenate the elements of a Tensor pair.
 join :
   (Tensor (n :: dims) ty, Tensor (m :: dims) ty)
   -> Tensor (n + m :: dims) ty
 join (xs, ys) = Tensor.concat xs ys
 
-||| Splitting and then joining does nothing.
+
 splitJoin :
   (n : Nat)
   -> (xs : Tensor (n + m :: dims) ty)
@@ -457,3 +540,54 @@ stitch2 {n = Z}     []        []        = []
 stitch2 {n = (S k)} (x :: xs) []        = rewrite plusZeroRightNeutral (S k) in (x :: xs)
 stitch2 {n = Z}     []        (y :: ys) = (y :: ys)
 stitch2 {n = (S k)} (x :: xs) (y :: ys) = x :: (stitch2 xs (y :: ys))
+
+{-
+dimTest :
+  {front : Dims 1}
+  -> {back : Dims 1}
+  -> {split : Split (front ++ back)}
+  -> Tensor split ty
+  -> Tensor split ty
+--dimTest {n = Z}     {m} {front = []}        {back = (b :: bs)} xs = xs
+--dimTest {n = (S k)} {m} {front = (f :: fs)} {back = (b :: bs)} xs = xs
+-}
+
+dimsTest :
+  Tensor ([d] ++ dims) ty
+  -> Tensor ([d] ++ dims) ty
+dimsTest xs = xs
+
+squeezeSecond :
+  Tensor ([d, 1] ++ dims) ty
+  -> Tensor ([d] ++ dims) ty
+squeezeSecond (TS xs) = TS $ map Tensor.squeeze xs
+
+squeezeSecond2 :
+  Tensor ([d] ++ [1] ++ dims) ty
+  -> Tensor ([d] ++ dims) ty
+squeezeSecond2 (TS xs) = TS $ map Tensor.squeeze xs
+
+threeIndex :
+  (a : Nat)
+  -> (b : Nat)
+  -> (c : Nat)
+  -> Tensor ([a + (S a'), b + (S b'), c + (S c')] ++ dims) ty
+  -> Tensor dims ty
+threeIndex a b c xs = Tensor.index c $ Tensor.index b $ Tensor.index a xs
+
+threeIndex2 :
+  DimsView [a, b, c]
+  -> Tensor ([a + (S a'), b + (S b'), c + (S c')] ++ dims) ty
+  -> Tensor dims ty
+threeIndex2 (MkDimsView [a, b, c]) xs = Tensor.index c $ Tensor.index b $ Tensor.index a xs
+
+threeIndex3 :
+  DimsView2 n is
+  -> {js : Vect n Nat}
+  -> Tensor ((zipWith (\x,y => x + (S y)) is js) ++ dims) ty
+  -> Tensor dims ty
+
+tIndexFinView :
+  Tensor (front ++ back) ty
+  -> FinView n $ map (\x => Fin x) front
+  -> Tensor back ty
