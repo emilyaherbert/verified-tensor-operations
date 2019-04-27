@@ -233,6 +233,7 @@ tindex {n = Z}     {js = []}        []        xs = xs
 tindex {n = (S k)} {js = (l :: ls)} (i :: is) xs = Tensor.tindex is {n = k} {js = ls} $ Tensor.index i xs
 -}
 
+{-
 tindex :
   (is : Vect (S n) Nat)
   -> {auto js : Vect (S n) Nat}
@@ -240,6 +241,7 @@ tindex :
   -> Tensor dims ty
 tindex {n = Z}     {js = (l :: [])} (i :: []) xs = Tensor.index i xs
 tindex {n = (S k)} {js = (l :: ls)} (i :: is) xs = Tensor.tindex is {n = k} {js = ls} $ Tensor.index i xs
+-}
 
 {-
 tindex : 
@@ -260,6 +262,25 @@ tindex :
   -> {ok : CompatibleDims is js xs}
   -> Tensor dims ty
 -}
+
+{-
+tindex : 
+  (is : Dims (S n))
+  -> {js : Dims (S n)}
+  -> {xs : DimsView (S n) (zipWith (\i,j => i + (S j)) is js)}
+  -> {dims : Dims m}
+  -> Tensor (xs ++ dims) ty
+  -> Tensor dims ty
+-}
+
+tindex : 
+  (is : Dims (S n))
+  -> {js : Dims (S n)}
+  -> {xs : Dims (S n)}
+  -> {auto ok : AddThrees is js xs}
+  -> {dims : Dims m}
+  -> Tensor (xs ++ dims) ty
+  -> Tensor dims ty
 
 --------------------------------------------------------------------------------
 -- Slicing
@@ -527,67 +548,3 @@ replaceAt_ = Tensor.replaceAt 9 test1 test3
 
 updateAt_ : Tensor [10, 10] Double
 updateAt_ = Tensor.updateAt 9 (\x => x + x) test1
-
---------------------------------------------------------------------------------
--- Concat test
---------------------------------------------------------------------------------
-
-stitch2 :
-  Dims n
-  -> Dims m
-  -> Dims (n + m)
-stitch2 {n = Z}     []        []        = []
-stitch2 {n = (S k)} (x :: xs) []        = rewrite plusZeroRightNeutral (S k) in (x :: xs)
-stitch2 {n = Z}     []        (y :: ys) = (y :: ys)
-stitch2 {n = (S k)} (x :: xs) (y :: ys) = x :: (stitch2 xs (y :: ys))
-
-{-
-dimTest :
-  {front : Dims 1}
-  -> {back : Dims 1}
-  -> {split : Split (front ++ back)}
-  -> Tensor split ty
-  -> Tensor split ty
---dimTest {n = Z}     {m} {front = []}        {back = (b :: bs)} xs = xs
---dimTest {n = (S k)} {m} {front = (f :: fs)} {back = (b :: bs)} xs = xs
--}
-
-dimsTest :
-  Tensor ([d] ++ dims) ty
-  -> Tensor ([d] ++ dims) ty
-dimsTest xs = xs
-
-squeezeSecond :
-  Tensor ([d, 1] ++ dims) ty
-  -> Tensor ([d] ++ dims) ty
-squeezeSecond (TS xs) = TS $ map Tensor.squeeze xs
-
-squeezeSecond2 :
-  Tensor ([d] ++ [1] ++ dims) ty
-  -> Tensor ([d] ++ dims) ty
-squeezeSecond2 (TS xs) = TS $ map Tensor.squeeze xs
-
-threeIndex :
-  (a : Nat)
-  -> (b : Nat)
-  -> (c : Nat)
-  -> Tensor ([a + (S a'), b + (S b'), c + (S c')] ++ dims) ty
-  -> Tensor dims ty
-threeIndex a b c xs = Tensor.index c $ Tensor.index b $ Tensor.index a xs
-
-threeIndex2 :
-  DimsView [a, b, c]
-  -> Tensor ([a + (S a'), b + (S b'), c + (S c')] ++ dims) ty
-  -> Tensor dims ty
-threeIndex2 (MkDimsView [a, b, c]) xs = Tensor.index c $ Tensor.index b $ Tensor.index a xs
-
-threeIndex3 :
-  DimsView2 n is
-  -> {js : Vect n Nat}
-  -> Tensor ((zipWith (\x,y => x + (S y)) is js) ++ dims) ty
-  -> Tensor dims ty
-
-tIndexFinView :
-  Tensor (front ++ back) ty
-  -> FinView n $ map (\x => Fin x) front
-  -> Tensor back ty
