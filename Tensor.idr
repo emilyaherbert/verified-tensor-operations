@@ -150,23 +150,23 @@ unzip3 (TS xs) =
 -- Scales and shifts
 --------------------------------------------------------------------------------
 
-scale : Num ty => Tensor dims ty -> ty -> Tensor dims ty
-scale xs v = map (\x => x * v) xs
+scale : Num ty => ty -> Tensor dims ty -> Tensor dims ty
+scale v xs = map (\x => x * v) xs
 
-scaleUp : Num ty => Tensor dims ty -> ty -> Tensor dims ty
-scaleUp xs v = scale xs v
+scaleUp : Num ty => ty -> Tensor dims ty -> Tensor dims ty
+scaleUp v xs = scale v xs
 
-scaleDown : (Num ty, Neg ty) => Tensor dims ty -> ty -> Tensor dims ty
-scaleDown xs v = scale xs (-v)
+scaleDown : (Num ty, Neg ty) => ty -> Tensor dims ty -> Tensor dims ty
+scaleDown v xs = scale (-v) xs
 
-shift : Num ty => Tensor dims ty -> ty -> Tensor dims ty
-shift xs v = map (\x => x + v) xs
+shift : Num ty => ty -> Tensor dims ty -> Tensor dims ty
+shift v xs = map (\x => x + v) xs
 
-shiftUp : Num ty => Tensor dims ty -> ty -> Tensor dims ty
-shiftUp xs v = shift xs v
+shiftUp : Num ty => ty -> Tensor dims ty -> Tensor dims ty
+shiftUp v xs = shift v xs
 
-shiftDown : (Num ty, Neg ty) => Tensor dims ty -> ty -> Tensor dims ty
-shiftDown xs v = shift xs (-v)
+shiftDown : (Num ty, Neg ty) => ty -> Tensor dims ty -> Tensor dims ty
+shiftDown v xs = shift (-v) xs
 
 --------------------------------------------------------------------------------
 -- Combine-two
@@ -276,10 +276,8 @@ tindex :
 tindex : 
   (is : Dims (S n))
   -> {js : Dims (S n)}
-  -> {xs : Dims (S n)}
-  -> {auto ok : AddThrees is js xs}
-  -> {dims : Dims m}
   -> Tensor (xs ++ dims) ty
+  -> {auto ok : AddThrees is js xs}
   -> Tensor dims ty
 
 --------------------------------------------------------------------------------
@@ -516,6 +514,11 @@ test4 = Tensor.fill 1.0 [4, 3, 4, 3]
 
 test5 : Tensor [1, 3, 4, 3] Double
 test5 = Tensor.fill 1.0 [1, 3, 4, 3]
+
+-- Hmm. Maybe define a function (at) that takes a Tensor to Tensor operation and does it at an index?
+test6 : Tensor [4, 2] Double
+test6 = (Tensor.fill 0.0 [1, 2]) ++ (Tensor.fill 1.0 [1, 2]) ++ (Tensor.fill 2.0 [1, 2]) ++ (Tensor.fill 3.0 [1, 2])
+-- umm. The xs is being doubled with this example?
 
 --------------------------------------------------------------------------------
 -- Tested functions
