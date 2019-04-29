@@ -273,11 +273,22 @@ tindex :
   -> Tensor dims ty
 -}
 
+{-
 tindex : 
   (is : Dims (S n))
   -> {js : Dims (S n)}
+  -> {xs : Dims (S n)}
   -> Tensor (xs ++ dims) ty
   -> {auto ok : AddThrees is js xs}
+  -> Tensor dims ty
+-}
+
+tindex : 
+  (is : Dims (S n))
+  -> {js : Dims (S n)}
+  -> {xs : Dims (S n)}
+  -> Tensor (xs ++ dims) ty
+  -> {ok : tryAddThrees is js xs = Just (is, js, xs)}
   -> Tensor dims ty
 
 --------------------------------------------------------------------------------

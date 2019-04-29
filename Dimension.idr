@@ -36,9 +36,9 @@ fromDimsView (MkDimsView xs') = xs'
 
 data AddThree : Nat -> Nat -> Nat -> Type where
   AddThreeZ : AddThree Z Z Z
-  AddThreeSLR : (ok : AddThree n m p) -> AddThree (S n) (S m) (S (S p))
   AddThreeSL  : (ok : AddThree n Z p) -> AddThree (S n) Z     (S p)
   AddThreeSR  : (ok : AddThree Z m p) -> AddThree Z     (S m) (S p)
+  AddThreeSLR : (ok : AddThree n m p) -> AddThree (S n) (S m) (S (S p))
 
 data AddThrees : Dims n -> Dims n -> Dims n -> Type where
   AddThreesZ : AddThrees [] [] []
@@ -68,6 +68,7 @@ fromRightSucc (AddThreeSR next) = next
 fromLeftRightSucc : AddThree (S n) (S m) (S (S p)) -> AddThree n m p
 fromLeftRightSucc (AddThreeSLR ok) = ok
 
+%hint
 canAddThree : (n : Nat) -> (m : Nat) -> (p : Nat) -> Dec (AddThree n m p)
 canAddThree Z     Z     Z       = Yes AddThreeZ
 canAddThree Z     Z     (S p)   = No goalTooBig
@@ -84,3 +85,35 @@ canAddThree (S n) (S m) (S Z)   = No leftRightTooBig'
 canAddThree (S n) (S m) (S (S p)) with (canAddThree n m p)
   canAddThree (S n) (S m) (S (S p)) | (Yes prf)   = Yes (AddThreeSLR prf)
   canAddThree (S n) (S m) (S (S p)) | (No contra) = No (contra . fromLeftRightSucc)
+
+
+tryAddThree : (n : Nat) -> (m : Nat) -> (p : Nat) -> Maybe (Nat, Nat, Nat)
+tryAddThree Z     Z     Z         = Nothing
+tryAddThree Z     Z     (S Z)     = Just (Z, Z, S Z)
+tryAddThree Z     Z     (S (S k)) = Nothing
+tryAddThree Z     (S k) Z         = Nothing
+tryAddThree Z     (S k) (S j)     =
+  case (tryAddThree Z k j) of
+    Nothing        => Nothing
+    Just (n, m, p) => Just (n, S m, S p)
+tryAddThree (S k) Z     Z         = Nothing
+tryAddThree (S k) Z     (S j)     =
+  case (tryAddThree k Z j) of
+    Nothing        => Nothing
+    Just (n, m, p) => Just (S n, m, S p)
+tryAddThree (S k) (S j) Z         = Nothing
+tryAddThree (S k) (S j) (S Z)     = Nothing
+tryAddThree (S k) (S j) (S (S i)) =
+  case (tryAddThree k j i) of
+    Nothing        => Nothing
+    Just (n, m, p) => Just (S n, S m, S (S p))
+
+tryAddThrees : Dims n -> Dims n -> Dims n -> Maybe (Dims n, Dims n, Dims n)
+tryAddThrees [] [] [] = Just ([], [], [])
+tryAddThrees (x :: xs) (y :: ys) (z :: zs) =
+  case (tryAddThree x y z) of
+    Nothing        => Nothing
+    Just (n, m, p) =>
+      case (tryAddThrees xs ys zs) of
+        Nothing           => Nothing
+        Just (ns, ms, ps) => Just (n :: ns, m :: ms, p :: ps)
