@@ -117,3 +117,34 @@ tryAddThrees (x :: xs) (y :: ys) (z :: zs) =
       case (tryAddThrees xs ys zs) of
         Nothing           => Nothing
         Just (ns, ms, ps) => Just (n :: ns, m :: ms, p :: ps)
+
+--------------------------------------------------------------------------------
+-- Attempts and Notes
+--------------------------------------------------------------------------------
+
+||| Given some Dims (n + m), prove you can split into Dims n and Dims m.
+data Split : (n : Nat) -> (o : Dims (n + m)) -> (l : Dims n) -> (r : Dims m) -> Type where
+  SZ : Split Z [] [] []
+  SR : (x : Nat) -> (xs : Split Z os ls rs) -> Split Z (x :: os) ls (r :: rs)
+  SL : (x : Nat) -> (xs : Split k os ls rs) -> Split (S k) (x :: os) (x :: ls) rs
+
+dconcat : (n : Nat) -> Dims n -> Dims m -> Dims (n + m)
+dconcat Z [] [] = []
+dconcat Z [] ys = ys
+dconcat (S k) xs [] = rewrite plusZeroRightNeutral k in xs
+dconcat (S k) (x :: xs) ys = x :: (dconcat k xs ys)
+
+data Loop : Dims n -> Dims n -> Type where
+  MkLoop : (xs : Dims n) -> Loop xs xs
+
+-- https://www.reddit.com/r/Idris/comments/9u94v8/for_types_with_custom_equality/
+-- https://stackoverflow.com/questions/47545150/proof-inside-nested-constructor-of-recursive-type
+
+--------------------------------------------------------------------------------
+-- Dims reboot
+--------------------------------------------------------------------------------
+
+codata Dims2 : Nat -> Type where
+  DZ : Dims2 0
+  DS : (x : Nat) -> (xs : Dims2 n) -> Dims2 (S n)
+  DC : (xs : Dims2 n) -> (xs' : Dims2 m) -> Dims2 (n + m)

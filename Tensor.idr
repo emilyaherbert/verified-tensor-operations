@@ -222,74 +222,35 @@ index :
 index n (TS xs) = vectIndex n xs
 
 {-
-tindex :
-  (is : Vect n Nat)z
-  {X : Vect n Nat}
-  -> {js : Vect n Nat}
-  -> Tensor (X ++ dims) ty
-  -> Data is X js
-  -> Tensor dims ty
-tindex {n = Z}     {js = []}        []        xs = xs
-tindex {n = (S k)} {js = (l :: ls)} (i :: is) xs = Tensor.tindex is {n = k} {js = ls} $ Tensor.index i xs
--}
+-- Cant use this one because it finds ok before it matches (ks ++ dims)
+-- This is what I need: https://github.com/idris-lang/Idris-dev/wiki/Copatterns#infix-copatterns
+-- Essentially, copatterns allow us to make projections on the left-hand side of function definitions. Left-hand side projections make sense for definitions from which we primarily want to extract data, contrary to injecting data into data constructors. Examples include record types and coinductive types.
 
-{-
-tindex :
-  (is : Vect (S n) Nat)
-  -> {auto js : Vect (S n) Nat}
-  -> Tensor ((zipWith (\i,j => i + (S j)) is js) ++ dims) ty
-  -> Tensor dims ty
-tindex {n = Z}     {js = (l :: [])} (i :: []) xs = Tensor.index i xs
-tindex {n = (S k)} {js = (l :: ls)} (i :: is) xs = Tensor.tindex is {n = k} {js = ls} $ Tensor.index i xs
--}
-
-{-
 tindex : 
   (is : Dims (S n))
   -> {js : Dims (S n)}
   -> {xs : Dims (S n)}
-  -> {ok : CompatibleDims is js xs}
-  -> Tensor (xs ++ dims) ty
-  -> Bool
--}
-
-{-
-tindex :
-  (is : Dims (S n))
-  -> {js : Dims (S n)}
-  -> {xs : Dims (S n)}
-  -> Tensor (xs ++ dims) ty
-  -> {ok : CompatibleDims is js xs}
-  -> Tensor dims ty
--}
-
-{-
-tindex : 
-  (is : Dims (S n))
-  -> {js : Dims (S n)}
-  -> {xs : DimsView (S n) (zipWith (\i,j => i + (S j)) is js)}
-  -> {dims : Dims m}
-  -> Tensor (xs ++ dims) ty
-  -> Tensor dims ty
--}
-
-{-
-tindex : 
-  (is : Dims (S n))
-  -> {js : Dims (S n)}
-  -> {xs : Dims (S n)}
-  -> Tensor (xs ++ dims) ty
+  -> Tensor (ks ++ dims) ty
   -> {auto ok : AddThrees is js xs}
   -> Tensor dims ty
 -}
 
+{-
 tindex : 
   (is : Dims (S n))
   -> {js : Dims (S n)}
-  -> {xs : Dims (S n)}
-  -> Tensor (xs ++ dims) ty
-  -> {ok : tryAddThrees is js xs = Just (is, js, xs)}
   -> Tensor dims ty
+  -> {auto ok : AddThrees is js (take (S n) dims)}
+  -> Tensor (drop (S n) dims) ty
+-}
+
+tindex : 
+  (is : Dims (S n))
+  -> {js : Dims (S n)}
+  -> Tensor dims ty
+  -> {auto split : Split (S n) dims ks rest}
+  -> {auto ok : AddThrees is js ks}
+  -> Tensor rest ty
 
 --------------------------------------------------------------------------------
 -- Slicing
