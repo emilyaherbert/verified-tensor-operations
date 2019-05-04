@@ -57,7 +57,7 @@ So, the first thought solution to this is to create a `(++)` constructor so that
 data Dims : Nat -> Type where
   Nil : Dims 0
   (::) : (x : Nat) -> (xs : Dims n) -> Dims (S n)
-  (++) : (xs : Dims n) -> (xs' : Dims m) -> Dims (n + m)
+  (++) : (xs : Dims n) -> (ys : Dims m) -> Dims (n + m)
 ```
 
 This could work, except for the fact that you need some type of implicit equivalency/ automatic conversion between instances of `Dims n` constructed with `(::)` and instances of `Dims n` constructed with `(++)`. You would need the `(::)` constructor to be able to match both `(::)` and `(++)`. As far as I can tell, there is no way to implement this currently, although there is a blurb on implementing copatterns which would make this straightforward (https://github.com/idris-lang/Idris-dev/wiki/Copatterns).
