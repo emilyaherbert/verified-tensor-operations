@@ -65,7 +65,7 @@ This could work, except for the fact that you need some type of implicit equival
 
 ## Hacky solution
 
-As I was typing this, I think I thought of an alternate solution that is hacky but might work. Instead of asking Idris for equivalency between the `(::)` and `(++)` constructors, just implement Dims as:
+As I was typing this, I thought of an alternate solution that is hacky but might work. Instead of asking Idris for equivalency between the `(::)` and `(++)` constructors, just implement Dims as:
 
 ```
 data Dims : Nat -> Type where
